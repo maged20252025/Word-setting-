@@ -1,47 +1,59 @@
 import streamlit as st
 from docx import Document
+from docx.shared import Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from io import BytesIO
 import os
 
 st.set_page_config(page_title="منسق المستندات القانونية", layout="centered")
-
 st.title("📄 منسق المستندات القانونية")
-st.markdown("قم برفع ملف Word غير منسق واختر قالبًا منسقًا ليتم تطبيق تنسيقه عليه تلقائيًا.")
+st.markdown("ارفع ملف Word غير منسق، واختر قالبًا لتطبيق تنسيقه على الملف.")
 
-# رفع الملف غير المنسق
-uploaded_file = st.file_uploader("📤 ارفع الملف غير منسق (.docx)", type=["docx"])
+uploaded_file = st.file_uploader("📤 ارفع ملف غير منسق (.docx)", type=["docx"])
 
-# اختيار القالب
 TEMPLATE_DIR = "templates"
 template_files = [f for f in os.listdir(TEMPLATE_DIR) if f.endswith(".docx")]
 selected_template = st.selectbox("📑 اختر القالب:", template_files)
 
-# عند الضغط على زر التنسيق
 if uploaded_file and selected_template:
     if st.button("✅ تنسيق الملف"):
         try:
-            # تحميل الملف غير المنسق
+            # قراءة الملف غير المنسق
             original_doc = Document(uploaded_file)
 
-            # تحميل القالب
+            # قراءة القالب واستخراج أول فقرة
             template_path = os.path.join(TEMPLATE_DIR, selected_template)
             template_doc = Document(template_path)
-
-            # استخراج أول فقرة كنموذج للتنسيق
             if not template_doc.paragraphs:
-                st.error("⚠️ القالب المحدد لا يحتوي على فقرات!")
+                st.error("❌ القالب لا يحتوي على فقرات.")
                 st.stop()
 
             sample_para = template_doc.paragraphs[0]
-            style = sample_para.style
+            sample_run = sample_para.runs[0] if sample_para.runs else None
 
-            # إنشاء مستند جديد بنفس تنسيق الفقرة الأولى من القالب
+            # تجهيز مستند جديد
             new_doc = Document()
+
             for para in original_doc.paragraphs:
                 if para.text.strip():
-                    new_para = new_doc.add_paragraph(para.text, style=style)
+                    new_para = new_doc.add_paragraph()
+                    new_run = new_para.add_run(para.text)
 
-            # حفظ النتيجة
+                    # تطبيق المحاذاة من القالب
+                    new_para.alignment = sample_para.alignment
+
+                    if sample_run:
+                        font = new_run.font
+                        sample_font = sample_run.font
+                        font.name = sample_font.name
+                        font.size = sample_font.size
+                        font.bold = sample_font.bold
+                        font.italic = sample_font.italic
+                        font.underline = sample_font.underline
+                        if sample_font.color and sample_font.color.rgb:
+                            font.color.rgb = sample_font.color.rgb
+
+            # حفظ الملف الجديد
             output = BytesIO()
             new_doc.save(output)
             output.seek(0)
